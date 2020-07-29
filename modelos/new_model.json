@@ -1,0 +1,29 @@
+[
+	{
+		"name":"X1",
+		"depends":[],
+		"range":[0.15,0.8]
+	},
+		{
+		"name":"X2",
+		"depends":[],
+		"range":[0.2,0.9]
+	},
+		{
+		"name":"X3",
+		"depends":[],
+		"range":[0.2,0.9]
+	},
+		{
+		"name":"Y1",
+		"depends":["X1","X2","X3"]
+	},
+		{
+		"name":"Y2",
+		"depends":["X1","X2","X3"]
+	},
+		{
+		"name":"Y3",
+		"depends":["X2","X3"]
+	}
+]

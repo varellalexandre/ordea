@@ -1,0 +1,10 @@
+*/__pycache__
+*/*/__pycache__
+__pycache__
+.pytest_cache
+*/.pytest_cache
+*.pyc
+re*.xlsx
+.DS_Store
+*.log
+*.db
