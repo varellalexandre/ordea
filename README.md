@@ -1,4 +1,4 @@
-# pyDEA
+# orDEA
 
 ### O que é DEA?
 
