@@ -4,7 +4,7 @@ def test_dea():
 		[20,151],
 		[19,131],
 		[25,160],
-		[27,168],
+		[20,168],
 		[22,158],
 		[55,255],
 		[33,235],
@@ -16,7 +16,7 @@ def test_dea():
 	]
 	out = [
 		[100,90],
-		[150,50],
+		[149,56],
 		[160,55],
 		[180,72],
 		[94,66],
@@ -30,13 +30,12 @@ def test_dea():
 	]
 	dea = DEA(inp,out)
 	writer = pd.ExcelWriter('resposta.xlsx')
-	dea.CCR(orientation='output').to_excel(writer,'CCR OUTPUT')
-	dea.CCR(orientation='input').to_excel(writer,'CCR INPUT')
-	dea.CCR(orientation='input',type='dual').to_excel(writer,'CCR INPUT DUAL')
-	dea.CCR(orientation='output',type='dual').to_excel(writer,'CCR OUTPUT DUAL')
-	dea.BCC(orientation='output').to_excel(writer,'BCC OUTPUT')
-	dea.BCC(orientation='input').to_excel(writer,'BCC INPUT')
-	dea.BCC(orientation='output',type='dual').to_excel(writer,'BCC OUTPUT DUAL')
-	dea.BCC(orientation='input',type='dual').to_excel(writer,'BCC INPUT DUAL')
+	pd.DataFrame(dea.CCR(orientation='output')).to_excel(writer,'CCR OUTPUT')
+	pd.DataFrame(dea.CCR(orientation='input')).to_excel(writer,'CCR INPUT')
+	pd.DataFrame(dea.CCR(orientation='input',type='dual')).to_excel(writer,'CCR INPUT DUAL')
+	pd.DataFrame(dea.CCR(orientation='output',type='dual')).to_excel(writer,'CCR OUTPUT DUAL')
+	pd.DataFrame(dea.BCC(orientation='output')).to_excel(writer,'BCC OUTPUT')
+	pd.DataFrame(dea.BCC(orientation='input')).to_excel(writer,'BCC INPUT')
+	pd.DataFrame(dea.BCC(orientation='output',type='dual')).to_excel(writer,'BCC OUTPUT DUAL')
+	pd.DataFrame(dea.BCC(orientation='input',type='dual')).to_excel(writer,'BCC INPUT DUAL')
 	writer.save()
-		

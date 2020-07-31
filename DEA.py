@@ -1,21 +1,24 @@
 from ortools.linear_solver import pywraplp
 import pandas as pd
+import copy
 #Objeto DEA para cálculo do algoritmo DEA
 #Ao iniciar o objeto basta passar os inputs e 
 #outputs desejados. O retorno das funções de 
 #cálculo é um dataframe
 class DEA:
 	def __init__(self,input:list,output:list):
-		assert len(input) == len(output)
-		self.solver = pywraplp.Solver('DEA',pywraplp.Solver.GLOP_LINEAR_PROGRAMMING)
-		self.objective = self.solver.Objective()
-		self.entries = input
-		self.out = output
-		self.incoef = []
-		self.outcoef = []
-		self.constraints = []
+		if len(input) == len(output):
+			self.solver = pywraplp.Solver('DEA',pywraplp.Solver.GLOP_LINEAR_PROGRAMMING)
+			self.objective = self.solver.Objective()
+			self.entries = input
+			self.out = output
+			self.incoef = []
+			self.outcoef = []
+			self.constraints = []
+		else:
+			raise Exception("Number of DMUs in inputs are different from the output")
 	
-	def __bcc_input_primal(self)->pd.DataFrame:
+	def __bcc_input_primal(self)->list:
 		resposta = []
 		for dmu in range(len(self.entries)):
 			#Definindo as variáveis
@@ -49,14 +52,14 @@ class DEA:
 				self.constraints[len(self.constraints)-1].SetCoefficient(self.incoef[i],self.entries[dmu][i])
 			resultado = self.solver.Solve()
 			resposta.append(dict())
-			resposta[len(resposta)-1]['bias'] = self.bias.solution_value()
+			resposta[-1]['bias'] = self.bias.solution_value()
 			for i in range(len(self.incoef)):
-				resposta[len(resposta)-1]['i'+str(i)] = self.incoef[i].solution_value()
+				resposta[-1]['i'+str(i)] = self.incoef[i].solution_value()
 			for j in range(len(self.outcoef)):
-				resposta[len(resposta)-1]['o'+str(j)] = self.outcoef[j].solution_value()
-		return pd.DataFrame(resposta)
+				resposta[-1]['o'+str(j)] = self.outcoef[j].solution_value()
+		return copy.deepcopy(resposta)
 
-	def __bcc_input_dual(self)->pd.DataFrame:
+	def __bcc_input_dual(self)->list:
 		resposta = []
 		for dmu in range(len(self.entries)):
 			#Definindo as variáveis
@@ -89,11 +92,11 @@ class DEA:
 			resultado = self.solver.Solve()
 			resposta.append(dict())
 			for i in range(len(self.lamb)):
-				resposta[len(resposta)-1]['lamb'+str(i).zfill(3)] = self.lamb[i].solution_value()
-			resposta[len(resposta)-1]['theta'] = self.theta.solution_value()
-		return pd.DataFrame(resposta)
+				resposta[-1]['lamb'+str(i).zfill(3)] = self.lamb[i].solution_value()
+			resposta[-1]['theta'] = self.theta.solution_value()
+		return copy.deepcopy(resposta)
 
-	def __bcc_output_primal(self)->pd.DataFrame:
+	def __bcc_output_primal(self)->list:
 		resposta = []
 		for dmu in range(len(self.entries)):
 			#Definindo as variáveis
@@ -127,14 +130,14 @@ class DEA:
 				self.constraints[len(self.constraints)-1].SetCoefficient(self.outcoef[i],self.out[dmu][i])
 			resultado = self.solver.Solve()
 			resposta.append(dict())
-			resposta[len(resposta)-1]['bias'] = self.bias.solution_value()
+			resposta[-1]['bias'] = self.bias.solution_value()
 			for i in range(len(self.incoef)):
-				resposta[len(resposta)-1]['i'+str(i)] = self.incoef[i].solution_value()
+				resposta[-1]['i'+str(i)] = self.incoef[i].solution_value()
 			for j in range(len(self.outcoef)):
-				resposta[len(resposta)-1]['o'+str(j)] = self.outcoef[j].solution_value()
-		return pd.DataFrame(resposta)
+				resposta[-1]['o'+str(j)] = self.outcoef[j].solution_value()
+		return copy.deepcopy(resposta)
 
-	def __bcc_output_dual(self)->pd.DataFrame:
+	def __bcc_output_dual(self)->list:
 		resposta = []
 		for dmu in range(len(self.entries)):
 			#Definindo as variáveis
@@ -165,11 +168,11 @@ class DEA:
 			resultado = self.solver.Solve()
 			resposta.append(dict())
 			for i in range(len(self.lamb)):
-				resposta[len(resposta)-1]['lamb'+str(i).zfill(3)] = self.lamb[i].solution_value()
-			resposta[len(resposta)-1]['theta'] = self.theta.solution_value()
-		return pd.DataFrame(resposta)
+				resposta[-1]['lamb'+str(i).zfill(3)] = self.lamb[i].solution_value()
+			resposta[-1]['theta'] = self.theta.solution_value()
+		return copy.deepcopy(resposta)
 
-	def __ccr_input_primal(self)->pd.DataFrame:
+	def __ccr_input_primal(self)->list:
 		resposta = []
 		for dmu in range(len(self.entries)):
 			#Definindo as variáveis
@@ -201,12 +204,12 @@ class DEA:
 			resultado = self.solver.Solve()
 			resposta.append(dict())
 			for i in range(len(self.incoef)):
-				resposta[len(resposta)-1]['i'+str(i)] = self.incoef[i].solution_value()
+				resposta[-1]['i'+str(i)] = self.incoef[i].solution_value()
 			for j in range(len(self.outcoef)):
-				resposta[len(resposta)-1]['o'+str(j)] = self.outcoef[j].solution_value()
-		return pd.DataFrame(resposta)
+				resposta[-1]['o'+str(j)] = self.outcoef[j].solution_value()
+		return copy.deepcopy(resposta)
 
-	def __ccr_input_dual(self)->pd.DataFrame:
+	def __ccr_input_dual(self)->list:
 		resposta = []
 		bench = []
 		for dmu in range(len(self.entries)):
@@ -238,12 +241,11 @@ class DEA:
 				if self.lamb[i].solution_value()>0:
 					if i not in bench:
 						bench.append(i)
-				resposta[len(resposta)-1]['lamb'+str(i).zfill(3)] = self.lamb[i].solution_value()
-			print('i = {}'.format(dmu),bench)
-			resposta[len(resposta)-1]['theta'] = self.theta.solution_value()
-		return pd.DataFrame(resposta)
+				resposta[-1]['lamb'+str(i).zfill(3)] = self.lamb[i].solution_value()
+			resposta[-1]['theta'] = self.theta.solution_value()
+		return  copy.deepcopy(resposta)
 
-	def __ccr_output_primal(self)->pd.DataFrame:
+	def __ccr_output_primal(self)->list:
 		resposta = []
 		for dmu in range(len(self.entries)):
 			#Definindo as variáveis
@@ -275,12 +277,12 @@ class DEA:
 			resultado = self.solver.Solve()
 			resposta.append(dict())
 			for i in range(len(self.incoef)):
-				resposta[len(resposta)-1]['i'+str(i)] = self.incoef[i].solution_value()
+				resposta[-1]['i'+str(i)] = self.incoef[i].solution_value()
 			for j in range(len(self.outcoef)):
-				resposta[len(resposta)-1]['o'+str(j)] = self.outcoef[j].solution_value()
-		return pd.DataFrame(resposta)
+				resposta[-1]['o'+str(j)] = self.outcoef[j].solution_value()
+		return copy.deepcopy(resposta)
 
-	def __ccr_output_dual(self)->pd.DataFrame:
+	def __ccr_output_dual(self)->list:
 		resposta = []
 		for dmu in range(len(self.entries)):
 			#Definindo as variáveis
@@ -308,11 +310,11 @@ class DEA:
 			resultado = self.solver.Solve()
 			resposta.append(dict())
 			for i in range(len(self.lamb)):
-				resposta[len(resposta)-1]['lamb'+str(i).zfill(3)] = self.lamb[i].solution_value()
-			resposta[len(resposta)-1]['theta'] = self.theta.solution_value()
-		return pd.DataFrame(resposta)
+				resposta[-1]['lamb'+str(i).zfill(3)] = self.lamb[i].solution_value()
+			resposta[-1]['theta'] = self.theta.solution_value()
+		return  copy.deepcopy(resposta)
 
-	def BCC(self,orientation:str='input',type:str='primal')->pd.DataFrame:
+	def BCC(self,orientation:str='input',type:str='primal')->list:
 		if type == 'primal':
 			if orientation == 'input':
 				return self.__bcc_input_primal()
@@ -324,7 +326,7 @@ class DEA:
 			elif orientation == 'output':
 				return self.__bcc_output_dual()
 
-	def CCR(self,orientation:str='input',type:str='primal')->pd.DataFrame:
+	def CCR(self,orientation:str='input',type:str='primal')->list:
 		if type == 'primal':
 			if orientation == 'input':
 				return self.__ccr_input_primal()

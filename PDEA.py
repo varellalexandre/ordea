@@ -1,201 +1,208 @@
 from ortools.linear_solver import pywraplp
+from typing import Optional
 import pandas as pd
 import json
+import copy
 class PDEA:
-	def get_inputs(self):
+	def __get_inputs(self)->list:
 		inputs = []
-		for i in self.bundles:
-			for j in i['I']:
-				if j not in inputs:
-					inputs.append(j)
-		return list(inputs)
+		for bundle_element in self.bundles:
+			for input_element in bundle_element['I']:
+				if input_element not in inputs:
+					inputs.append(input_element)
+		return copy.deepcopy(inputs)
 
-	def get_objective(self,dmu):
-		for i,out in enumerate(self.get_outputs()):
-			self.obj.SetCoefficient(self.solver.\
-				LookupVariable('u{}'.format(out)),
-				float(dmu[out])
-			)
-		self.obj.SetMaximization()
+	def get_objective(self,dmu:pd.Series)->pywraplp.Solver.Objective:
+		objective_function = self.solver.Objective()
+		for output_element in self.__get_outputs():
+			objective_function.SetCoefficient(self.solver.\
+												LookupVariable('u{}'.format(output_element)),
+												float(dmu[output_element])
+											)
+		return objective_function
 
 
-	def get_outputs(self):
+	def __get_outputs(self)->list:
 		outputs = []
-		for i in self.bundles:
-			for j in i['R']:
-				if j not in outputs:
-					outputs.append(j)
-		return list(outputs)
+		for bundle_element in self.bundles:
+			for output_element in bundle_element['R']:
+				if output_element not in outputs:
+					outputs.append(output_element)
+		return copy.deepcopy(outputs)
 
-	def get_paths(self):
-		lista = []
-		try:
-			type(self.bundles)
-		except:
-			self.bundles = self.get_bundles(self.file)
-		for index, i in enumerate(self.bundles):
-			for j in i['R']:
+	def __get_paths(self)->list:
+		lista = list()
+		for bundle_element in self.bundles:
+			for bundle_output in bundle_element['R']:
 				aux = dict()
-				aux['R'] = [j]
-				aux['I'] = list(i['I'])
+				aux['R'] = [bundle_output]
+				aux['I'] = list(bundle_element['I'])
 				lista.append(dict(aux))
-		return lista
+		return copy.deepcopy(lista)
 
-	def get_sub_var(self,k):
+	def __get_sub_var(self,input_element:str)->list:
 		lista = []
-		for index,i in enumerate(self.bundles):
-			if k in i['I']:
-				lista.append('w{}{}'.format(k,index))
-		return list(lista)
+		for index,bundle_element in enumerate(self.bundles):
+			if input_element in bundle_element['I']:
+				lista.append('w{}{}'.format(input_element,index))
+		return copy.deepcopy(lista)
 
-	def get_variables(self,eps):
-		inp = self.get_inputs()
-		out = self.get_outputs()
+	def get_variables(self,eps:float)->list:
+		inputs = self.__get_inputs()
+		outputs = self.__get_outputs()
 		variables = []
-		for i in inp:
-			self.solver.NumVar(eps,self.solver.infinity(),'v{}'.format(i))
-			variables.append('v{}'.format(i))
-			for k in self.get_sub_var(i):
-				self.solver.NumVar(eps,self.solver.infinity(),k)
-				variables.append(k)
-		for i in out:
-			self.solver.NumVar(eps,self.solver.infinity(),'u{}'.format(i))
-			variables.append('u{}'.format(i))
-		return list(variables)
+		for input_element in inputs:
+			self.solver.NumVar(eps,self.solver.infinity(),'v{}'.format(input_element))
+			variables.append('v{}'.format(input_element))
+			for sub_variable in self.__get_sub_var(input_element):
+				self.solver.NumVar(eps,self.solver.infinity(),sub_variable)
+				variables.append(sub_variable)
+		for output_element in outputs:
+			self.solver.NumVar(eps,self.solver.infinity(),'u{}'.format(output_element))
+			variables.append('u{}'.format(output_element))
+		return copy.deepcopy(variables)
 
-	def restriction_b(self,dmu):
-		self.restrictions.append(self.solver.Constraint(1,1))
-		for i in self.get_inputs():
-			inp_var = self.solver.LookupVariable('v{}'.format(i))
-			actual = len(self.restrictions)-1
-			self.restrictions[actual].SetCoefficient(inp_var,float(dmu[i]))
-		return 
+	def __get_restriction_b(self,dmu:pd.Series)->list:
+		#Referido no artigo Imanirad et. al.(2015)
+		#SUM vi*Xij0 = 1
+		restriction_list = list()
+		restriction_list.append(self.solver.Constraint(1,1))
+		for input_element in self.__get_inputs():
+			input_var = self.solver.LookupVariable('v{}'.format(input_element))
+			restriction_list[-1].SetCoefficient(input_var,float(dmu[input_element]))
+		return restriction_list
 
-	def restriction_c(self):
-		for ind,dmu in self.set.iterrows():
-			for index,i in enumerate(self.bundles):
-				self.restrictions.append(self.solver.Constraint(-self.solver.infinity(),0))
-				actual = len(self.restrictions)-1
-				for out in i['R']:
-					self.restrictions[actual].\
-						SetCoefficient(self.solver.\
-							LookupVariable('u{}'.format(out)),
-							float(dmu[out])
-						)
-				for inp in i['I']:
-					self.restrictions[actual].\
-						SetCoefficient(self.solver.\
-							LookupVariable('w{}{}'.format(inp,index)),
-							float(-dmu[inp])
-						)
-		return
+	def __get_restriction_c(self)->list:
+		#Referido no artigo Imanirad et. al.(2015)
+		#SUM urYrj - SUM (gama)ikpXij <=0
+		restriction_list = list()
+		for _,dmu in self.set.iterrows():
+			for bundle_element in self.bundles:
+				restriction_list.append(self.solver.Constraint(-self.solver.infinity(),0))
+				for output_element in bundle_element['R']:
+					restriction_list[-1].SetCoefficient(self.solver.\
+											LookupVariable('u{}'.format(output_element)),
+											float(dmu[output_element])
+										)
+				for index,input_element in enumerate(bundle_element['I']):
+					restriction_list[-1].SetCoefficient(self.solver.\
+													LookupVariable('w{}{}'.format(input_element,index)),
+													float(-dmu[input_element])
+												)
+		return restriction_list
 
-	def restriction_d(self):
-		for k in self.get_inputs():
-			var = self.solver.LookupVariable('v{}'.format(k))
-			self.restrictions.append(self.solver.Constraint(0,0))
-			actual = len(self.restrictions)-1
-			self.restrictions[actual].SetCoefficient(var,-1)
-			lista = self.get_sub_var(k)
-			for i in lista:
-				sub_var = self.solver.LookupVariable(i)
-				self.restrictions[actual].SetCoefficient(sub_var,1)
+	def __get_restriction_d(self)->list:
+		#Referido no artigo Imanirad et. al.(2015)
+		#(gama)ikp=Vi
+		restriction_list = list()
+		for input_element in self.__get_inputs():
+			variable = self.solver.LookupVariable('v{}'.format(input_element))
+			restriction_list.append(self.solver.Constraint(0,0))
+			restriction_list[-1].SetCoefficient(variable,-1)
+			for sub_variable in self.__get_sub_var(input_element):
+				restriction_list[-1].SetCoefficient(self.solver.\
+										LookupVariable(sub_variable),
+										1)
+		return restriction_list
 
-	def restriction_e(self):
-		inp = self.get_inputs()
-		for i in self.organization:
-			if i['name'] in inp:
-				lista = self.get_sub_var(i['name'])
-				for k in lista:
+	def __get_restriction_e(self)->list:
+		#Referido no artigo Imanirad et. al.(2015)
+		#Restringe os limites
+		#vaikp<=(gama)ikp<=Vibikp
+		restriction_list = list()
+		input_elements = self.__get_inputs()
+		for node_element in self.diagram:
+			if node_element['name'] in input_elements:
+				for sub_variable in self.__get_sub_var(node_element['name']):
 					#Menor ou igual
-					self.restrictions.append(self.solver.Constraint(-self.solver.infinity(),0))
-					actual = len(self.restrictions)-1
-					var_x = self.solver.LookupVariable("v{}".format(i['name']))
-					sub_var_x = self.solver.LookupVariable("{}".format(k))
-					self.restrictions[actual].SetCoefficient(var_x,float(i['range'][0]))
-					self.restrictions[actual].SetCoefficient(sub_var_x,-1)
+					restriction_list.append(self.solver.Constraint(-self.solver.infinity(),0))
+					variable_x = self.solver.LookupVariable("v{}".format(node_element['name']))
+					sub_variable_x = self.solver.LookupVariable("{}".format(sub_variable))
+					restriction_list[-1].SetCoefficient(variable_x,float(node_element['range'][0]))
+					restriction_list[-1].SetCoefficient(sub_variable_x,-1)
 					#Maior ou igual
-					self.restrictions.append(self.solver.Constraint(0,self.solver.infinity()))
-					actual = len(self.restrictions)-1
-					var_x = self.solver.LookupVariable("v{}".format(i['name']))
-					sub_var_x = self.solver.LookupVariable("{}".format(k))
-					self.restrictions[actual].SetCoefficient(var_x,float(i['range'][1]))
-					self.restrictions[actual].SetCoefficient(sub_var_x,-1)
+					restriction_list.append(self.solver.Constraint(0,self.solver.infinity()))
+					variable_x = self.solver.LookupVariable("v{}".format(node_element['name']))
+					sub_variable_x = self.solver.LookupVariable("{}".format(sub_variable))
+					restriction_list[-1].SetCoefficient(variable_x,float(node_element['range'][1]))
+					restriction_list[-1].SetCoefficient(sub_variable_x,-1)
+		return restriction_list
 
-
-	def get_bundles(self,file):
-		def compare_dependencies(a,b):
-			if len(a) != len(b):
+	def __get_bundles(self,file:str)->list:
+		def compare_dependencies(variable_inputs:list,bundle_inputs:list)->bool:
+			if len(variable_inputs) != len(bundle_inputs):
+				#	Caso a quantidade de inputs seja diferente
+				#a variável não pertence ao bundle retornando falso
 				return False
 			else:
-				for el in a:
-					if el in b:
+				for input_element in variable_inputs:
+					#	Verifica se todos os elementos de input da variável
+					#estão contídos nos inputs do bundle
+					if input_element in bundle_inputs:
 						continue
 					else:
 						return False
 			return True
-		with open(file) as infile:
-			data = json.load(infile)
-		self.organization = data
+
+
+		with open(file) as file_schema:
+			data = json.load(file_schema)
+			file_schema.close()
+		self.diagram = data
 		bundles = []
-		for index,i in enumerate(self.organization):
-			if len(i["depends"]) < 1:
+		for variable in self.diagram:
+			if len(variable["depends"]) < 1:
 				continue
-			for j in bundles:
-				if compare_dependencies(i["depends"],j['I']):
-					j['R'].append(i["name"])
+			for bundle_element in bundles:
+				#Tenta encaixar uma variável em um bundle
+				if compare_dependencies(variable["depends"],bundle_element['I']):
+					bundle_element['R'].append(variable["name"])
 					break
 			else:
 				aux = dict()
-				aux["I"] = list(i["depends"])
-				aux["R"] = [i["name"]]
+				aux["I"] = list(variable["depends"])
+				aux["R"] = [variable["name"]]
 				bundles.append(aux)
-		return list(bundles)
+		return copy.deepcopy(bundles)
 
-	def get_restrictions(self,dmu):
-		self.restriction_b(dmu)
-		self.restriction_c()
-		self.restriction_d()
-		self.restriction_e()
-		
-	def get_coef(self,element):
+	def get_restrictions(self,dmu)->list:
+		restrictions = 	self.__get_restriction_b(dmu)+\
+						self.__get_restriction_c()+\
+						self.__get_restriction_d()+\
+						self.__get_restriction_e()
+		return list(restrictions)
+
+	def __get_coef(self,element)->list:
 		aux = dict()
-		for j in self.solver.variables():
-			aux[j.name()] = element.GetCoefficient(j)
+		for variable in self.solver.variables():
+			aux[variable.name()] = element.GetCoefficient(variable)
 		aux['lb'] = element.lb()
 		aux['ub'] = element.ub()
-		return aux
+		return copy.deepcopy(aux)
 
-	def __init__(self,file,dataset,path = 'resp_partial.xlsx' ,eps = 0.000000999999,save_dmu = False):
-		self.set = dataset
-		resposta = []
-		self.file = file
-		writer = pd.ExcelWriter(path, engine='xlsxwriter')
+	def solve(self)->list:
+		results = list()
 		for i,dmu in self.set.iterrows():
-			coef = []
 			self.solver = pywraplp.Solver('PartialDEA',pywraplp.Solver.GLOP_LINEAR_PROGRAMMING)
-			self.obj = self.solver.Objective()
-			self.bundles = self.get_bundles(file)
-			self.paths = self.get_paths()
-			self.variables = self.get_variables(eps)
-			self.restrictions = []
-			self.get_objective(dmu)
-			self.get_restrictions(dmu)
-			for j in self.restrictions:
-				coef.append(self.get_coef(j))
-			resultado = self.solver.Solve()
-			if save_dmu == True:
-				pd.DataFrame(coef).to_excel(writer,sheet_name='DMU-{}'.format(i))
+			self.variables = self.get_variables(self.eps)
+			self.obj = self.get_objective(dmu)
+			self.restrictions = self.get_restrictions(dmu)
+			result = self.solver.Solve()
 			aux = dict()
-			for j in self.variables:
-				aux[j] = self.solver.LookupVariable(j).solution_value()
-			aux['Resultado'] = resultado
-			resposta.append(aux)
-		res = pd.DataFrame(resposta)
-		for i in self.get_inputs():
-			for index, var in enumerate(self.get_sub_var(i)):
-				nome = i+"{}".format(index+1)
-				res[nome] = res[var]/res["v"+i]
-		self.frame = res
+			for variable in self.variables:
+				aux[variable] = self.solver.LookupVariable(variable).solution_value()
+			aux['Resultado'] = result
+			results.append(aux)
+		return copy.deepcopy(results)
 
-	
+
+	def __init__(self,
+				file:str,
+				dataset:pd.DataFrame,
+				eps:Optional[float] = 0.000000999999):
+
+		self.set = pd.DataFrame(dataset)
+		self.file = file
+		self.bundles = self.__get_bundles(file)
+		self.paths = self.__get_paths()
+		self.eps = eps
